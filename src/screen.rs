@@ -66,7 +66,7 @@ pub struct Screen {
     /// on the current window size) and will be the first line to be
     /// popped off the front of the screen when a new line is added that
     /// would otherwise have exceeded the line capacity
-    pub(crate) lines: VecDeque<Line>,
+    pub lines: VecDeque<Line>,
 
     /// Whenever we scroll a line off the top of the scrollback, we
     /// increment this.  We use this offset to translate between
@@ -80,7 +80,7 @@ pub struct Screen {
     /// that we're the primary rather than the alternate screen.
     allow_scrollback: bool,
 
-    pub(crate) keyboard_stack: Vec<KeyboardEncoding>,
+    pub keyboard_stack: Vec<KeyboardEncoding>,
 
     /// Physical, visible height of the screen (not including scrollback)
     pub physical_rows: usize,

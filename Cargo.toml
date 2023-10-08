@@ -1,0 +1,51 @@
+[package]
+name = "wezterm_portable"
+version = "0.1.0"
+authors = ["Wez Furlong", "Vlad Gapchych"]
+edition = "2018"
+repository = "https://github.com/gavlig/wezterm_portable"
+license = "MIT"
+
+[dependencies]
+
+termwiz				= { path = "../wezterm/termwiz", features = ["use_image"] } # { version = "0.20.0" }
+wezterm-bidi		= { path = "../wezterm/bidi" } # { version = "0.2.2" }
+
+anyhow				= "1"
+log					= { version = "0.4" }
+hex                 = { version = "0.4.3"}
+
+thiserror			= { version = "1.0" }
+filedescriptor		= { version = "0.8" }
+crossbeam-channel	= { version = "0.5" }
+
+num-traits			= { version = "0.2" }
+csscolorparser		= { version = "0.6", features=["lab"] }
+lazy_static			= { version = "1.4" }
+ordered-float		= { version = "3.7" }
+unicode-normalization = { version = "0.1" }
+finl_unicode		= { version = "1.2" }
+url					= { version = "2.4" }
+humansize			= { version = "2.1" }
+image				= { version = "0.24" }
+miniz_oxide			= { version = "0.4.4" }
+terminfo			= { version = "0.8" }
+lru					= { version = "0.7" }
+
+libc				= { version = "0.2" }
+
+[target."cfg(unix)".dependencies]
+signal-hook = "0.3"
+termios = "0.3"
+nix = "0.26"
+
+[target."cfg(windows)".dependencies]
+winapi = { version = "0.3", features = [
+    "winuser",
+    "handleapi",
+    "fileapi",
+    "namedpipeapi",
+    "processthreadsapi",
+    "winsock2",
+    "processenv"
+]}

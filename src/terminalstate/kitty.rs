@@ -4,7 +4,7 @@
 use super::image::*;
 use super::image::{ImageAttachParams, PlacementInfo};
 use super::TerminalState;
-use crate::bevy_wezterm::wezterm_portable::screen::StableRowIndex;
+use crate::screen::StableRowIndex;
 use ::image::{
     DynamicImage, GenericImage, GenericImageView, ImageBuffer, RgbImage, Rgba, RgbaImage,
 };
