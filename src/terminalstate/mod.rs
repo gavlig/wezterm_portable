@@ -858,20 +858,20 @@ impl TerminalState {
             return;
         }
         if !focused {
-            // notify app of release of buttons
-            let buttons = self.current_mouse_buttons.clone();
-            for b in buttons {
-                self.mouse_event(MouseEvent {
-                    kind: MouseEventKind::Release,
-                    button: b,
-                    modifiers: KeyModifiers::NONE,
-                    x: 0,
-                    y: 0,
-                    x_pixel_offset: 0,
-                    y_pixel_offset: 0,
-                })
-                .ok();
-            }
+            // // notify app of release of buttons
+            // let buttons = self.current_mouse_buttons.clone();
+            // for b in buttons {
+            //     self.mouse_event(MouseEvent {
+            //         kind: MouseEventKind::Release,
+            //         button: b,
+            //         modifiers: KeyModifiers::NONE,
+            //         x: 0,
+            //         y: 0,
+            //         x_pixel_offset: 0,
+            //         y_pixel_offset: 0,
+            //     })
+            //     .ok();
+            // }
         }
         if self.focus_tracking {
             write!(self.writer, "{}{}", CSI, if focused { "I" } else { "O" }).ok();
@@ -1787,11 +1787,11 @@ impl TerminalState {
 
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::MouseTracking)) => {
                 self.mouse_tracking = true;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::MouseTracking)) => {
                 self.mouse_tracking = false;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::MouseTracking)) => {
                 self.decqrm_response(mode, true, self.mouse_tracking);
@@ -1806,13 +1806,13 @@ impl TerminalState {
 
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::ButtonEventMouse)) => {
                 self.button_event_mouse = true;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(
                 DecPrivateModeCode::ButtonEventMouse,
             )) => {
                 self.button_event_mouse = false;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(
                 DecPrivateModeCode::ButtonEventMouse,
@@ -1822,11 +1822,11 @@ impl TerminalState {
 
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::AnyEventMouse)) => {
                 self.any_event_mouse = true;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::AnyEventMouse)) => {
                 self.any_event_mouse = false;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::AnyEventMouse)) => {
                 self.decqrm_response(mode, true, self.any_event_mouse);
@@ -1834,11 +1834,11 @@ impl TerminalState {
 
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::FocusTracking)) => {
                 self.focus_tracking = true;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::FocusTracking)) => {
                 self.focus_tracking = false;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::FocusTracking)) => {
                 self.decqrm_response(mode, true, self.focus_tracking);
@@ -1846,11 +1846,11 @@ impl TerminalState {
 
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::SGRMouse)) => {
                 self.mouse_encoding = MouseEncoding::SGR;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::SGRMouse)) => {
                 self.mouse_encoding = MouseEncoding::X10;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::SGRMouse)) => {
                 self.decqrm_response(
@@ -1864,11 +1864,11 @@ impl TerminalState {
             }
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::SGRPixelsMouse)) => {
                 self.mouse_encoding = MouseEncoding::SgrPixels;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::SGRPixelsMouse)) => {
                 self.mouse_encoding = MouseEncoding::X10;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::SGRPixelsMouse)) => {
                 self.decqrm_response(
@@ -1883,11 +1883,11 @@ impl TerminalState {
 
             Mode::SetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::Utf8Mouse)) => {
                 self.mouse_encoding = MouseEncoding::Utf8;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::ResetDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::Utf8Mouse)) => {
                 self.mouse_encoding = MouseEncoding::X10;
-                self.last_mouse_move.take();
+                // self.last_mouse_move.take();
             }
             Mode::QueryDecPrivateMode(DecPrivateMode::Code(DecPrivateModeCode::Utf8Mouse)) => {
                 self.decqrm_response(
