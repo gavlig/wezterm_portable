@@ -1,18 +1,16 @@
-use crate::terminal::Alert;
-use crate::terminalstate::{
-    default_color_map, CharSet, MouseEncoding, TabStop, UnicodeVersionStackEntry,
-};
-use crate::{ClipboardSelection, Position, TerminalState, VisibleRowIndex, DCS, ST};
+// forked from wezterm/term/src/terminalstate/performer.rs git commit f4abf8fde
+// MIT License
+
+use super::{TerminalState, Position, DCS, ST, ClipboardSelection, VisibleRowIndex, Alert, CharSet, MouseEncoding, TabStop, UnicodeVersionStackEntry, default_color_map};
 use finl_unicode::grapheme_clusters::Graphemes;
 use log::{debug, error};
 use num_traits::FromPrimitive;
 use ordered_float::NotNan;
 use std::fmt::Write;
 use std::io::Write as _;
-use std::ops::{Deref, DerefMut};
 use termwiz::cell::{grapheme_column_width, Cell, CellAttributes, SemanticType};
 use termwiz::escape::csi::{
-    CharacterPath, EraseInDisplay, Keyboard, KittyKeyboardFlags, KittyKeyboardMode,
+    CharacterPath, EraseInDisplay, Keyboard, KittyKeyboardFlags, KittyKeyboardMode
 };
 use termwiz::escape::osc::{
     ChangeColorPair, ColorOrQuery, FinalTermSemanticPrompt, ITermProprietary,
@@ -26,41 +24,7 @@ use unicode_normalization::{is_nfc_quick, IsNormalized, UnicodeNormalization};
 use url::Url;
 use wezterm_bidi::ParagraphDirectionHint;
 
-/// A helper struct for implementing `vtparse::VTActor` while compartmentalizing
-/// the terminal state and the embedding/host terminal interface
-pub(crate) struct Performer<'a> {
-    pub state: &'a mut TerminalState,
-    print: String,
-}
-
-impl<'a> Deref for Performer<'a> {
-    type Target = TerminalState;
-
-    fn deref(&self) -> &TerminalState {
-        self.state
-    }
-}
-
-impl<'a> DerefMut for Performer<'a> {
-    fn deref_mut(&mut self) -> &mut TerminalState {
-        &mut self.state
-    }
-}
-
-impl<'a> Drop for Performer<'a> {
-    fn drop(&mut self) {
-        self.flush_print();
-    }
-}
-
-impl<'a> Performer<'a> {
-    pub fn new(state: &'a mut TerminalState) -> Self {
-        Self {
-            state,
-            print: String::new(),
-        }
-    }
-
+impl TerminalState {
     /// Apply character set related remapping to the input glyph if required
     fn remap_grapheme<'b>(&self, g: &'b str) -> &'b str {
         if (self.shift_out && self.g1_charset == CharSet::DecLineDrawing)
@@ -112,7 +76,7 @@ impl<'a> Performer<'a> {
         }
     }
 
-    fn flush_print(&mut self) {
+    pub fn flush_print(&mut self) {
         if self.print.is_empty() {
             return;
         }
@@ -149,8 +113,8 @@ impl<'a> Performer<'a> {
                 // resized.
                 {
                     let y = self.cursor.y;
-                    let is_conpty = self.state.enable_conpty_quirks;
-                    let is_alt = self.state.screen.alt_screen_is_active;
+                    let is_conpty = self.enable_conpty_quirks;
+                    let is_alt = self.screen.alt_screen_is_active;
                     let screen = self.screen_mut();
                     let y = screen.phys_row(y);
 
@@ -475,7 +439,7 @@ impl<'a> Performer<'a> {
         self.pop_tmux_title_state();
         self.flush_print();
         match csi {
-            CSI::Sgr(sgr) => self.state.perform_csi_sgr(sgr),
+            CSI::Sgr(sgr) => self.perform_csi_sgr(sgr),
             CSI::Cursor(termwiz::escape::csi::Cursor::Left(n)) => {
                 // We treat CUB (Cursor::Left) the same as Backspace as
                 // that is what xterm does.
@@ -484,23 +448,21 @@ impl<'a> Performer<'a> {
                     self.control(ControlCode::Backspace);
                 }
             }
-            CSI::Cursor(cursor) => self.state.perform_csi_cursor(cursor),
-            CSI::Edit(edit) => self.state.perform_csi_edit(edit),
-            CSI::Mode(mode) => self.state.perform_csi_mode(mode),
-            CSI::Device(dev) => self.state.perform_device(*dev),
+            CSI::Cursor(cursor) => self.perform_csi_cursor(cursor),
+            CSI::Edit(edit) => self.perform_csi_edit(edit),
+            CSI::Mode(mode) => self.perform_csi_mode(mode),
+            CSI::Device(dev) => self.perform_device(*dev),
             CSI::Mouse(mouse) => error!("mouse report sent by app? {:?}", mouse),
-            CSI::Window(window) => self.state.perform_csi_window(*window),
+            CSI::Window(window) => self.perform_csi_window(*window),
             CSI::SelectCharacterPath(CharacterPath::ImplementationDefault, _) => {
-                self.state.bidi_hint.take();
+                self.bidi_hint.take();
             }
             CSI::SelectCharacterPath(CharacterPath::LeftToRightOrTopToBottom, _) => {
-                self.state
-                    .bidi_hint
+                self.bidi_hint
                     .replace(ParagraphDirectionHint::LeftToRight);
             }
             CSI::SelectCharacterPath(CharacterPath::RightToLeftOrBottomToTop, _) => {
-                self.state
-                    .bidi_hint
+                self.bidi_hint
                     .replace(ParagraphDirectionHint::RightToLeft);
             }
             CSI::Keyboard(Keyboard::SetKittyState { flags, mode }) => {

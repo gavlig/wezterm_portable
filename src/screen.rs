@@ -1,11 +1,56 @@
+// forked from wezterm/term/src/screen.rs git commit f4abf8fde
+// MIT License
+
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::range_plus_one))]
 use super::*;
-use crate::config::BidiMode;
+use super::config::{BidiMode, TerminalConfiguration};
 use log::debug;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::ops::Range;
 use termwiz::input::KeyboardEncoding;
 use termwiz::surface::SequenceNo;
+use termwiz::surface::line::Line;
+use terminalstate::{TerminalSize, CursorPosition};
+use termwiz::cell::{Cell, CellAttributes};
+
+/// Represents the index into screen.lines.  Index 0 is the top of
+/// the scrollback (if any).  The index of the top of the visible screen
+/// depends on the terminal dimensions and the scrollback size.
+pub type PhysRowIndex = usize;
+
+/// Represents an index into the visible portion of the screen.
+/// Value 0 is the first visible row.  `VisibleRowIndex` needs to be
+/// resolved into a `PhysRowIndex` to obtain an actual row.  It is not
+/// valid to have a negative `VisibleRowIndex` value so this type logically
+/// should be unsigned, however, having a different sign is helpful to
+/// have the compiler catch accidental arithmetic performed between
+/// `PhysRowIndex` and `VisibleRowIndex`.  We could define our own type with
+/// its own `Add` and `Sub` operators, but then we'd not be able to iterate
+/// over `Ranges` of these types without also laboriously implementing an
+/// iterator `Skip` trait that is currently only in unstable rust.
+pub type VisibleRowIndex = i64;
+
+/// Like `VisibleRowIndex` above, but can index backwards into scrollback.
+/// This is deliberately a differently sized signed type to catch
+/// accidentally blending together the wrong types of indices.
+/// This is explicitly 32-bit rather than 64-bit as it seems unreasonable
+/// to want to scroll back or select more than ~2billion lines of scrollback.
+pub type ScrollbackOrVisibleRowIndex = i32;
+
+/// Allows referencing a logical line in the scrollback, allowing for scrolling.
+/// The StableRowIndex counts from the top of the scrollback, growing larger
+/// as you move down through the display rows.
+/// Initially the very first line as StableRowIndex==0.  If the scrollback
+/// is filled and lines are purged (say we need to purge 5 lines), then whichever
+/// line is first in the scrollback (PhysRowIndex==0) will now have StableRowIndex==5
+/// which is the same value that that logical line had prior to data being purged
+/// out of the scrollback.
+///
+/// As per ScrollbackOrVisibleRowIndex above, a StableRowIndex can never
+/// legally be a negative number.  We're just using a differently sized type
+/// to have the compiler assist us in detecting improper usage.
+pub type StableRowIndex = isize;
 
 /// Holds the model of a screen.  This can either be the primary screen
 /// which includes lines of scrollback text, or the alternate screen
@@ -21,7 +66,7 @@ pub struct Screen {
     /// on the current window size) and will be the first line to be
     /// popped off the front of the screen when a new line is added that
     /// would otherwise have exceeded the line capacity
-    lines: VecDeque<Line>,
+    pub(crate) lines: VecDeque<Line>,
 
     /// Whenever we scroll a line off the top of the scrollback, we
     /// increment this.  We use this offset to translate between

@@ -1,6 +1,10 @@
-use crate::terminalstate::image::*;
-use crate::terminalstate::{ImageAttachParams, PlacementInfo};
-use crate::{StableRowIndex, TerminalState};
+// forked from wezterm/term/src/terminalstate/kitty.rs git commit f4abf8fde
+// MIT License
+
+use super::image::*;
+use super::image::{ImageAttachParams, PlacementInfo};
+use super::TerminalState;
+use crate::bevy_wezterm::wezterm_portable::screen::StableRowIndex;
 use ::image::{
     DynamicImage, GenericImage, GenericImageView, ImageBuffer, RgbImage, Rgba, RgbaImage,
 };

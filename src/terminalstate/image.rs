@@ -1,4 +1,8 @@
-use crate::{Position, StableRowIndex, TerminalState};
+// forked from wezterm/term/src/terminalstate/image.rs git commit f4abf8fde
+// MIT License
+
+use crate::screen::StableRowIndex;
+use super::{Position, TerminalState};
 use anyhow::Context;
 use humansize::{SizeFormatter, DECIMAL};
 use ordered_float::NotNan;

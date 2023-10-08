@@ -1,42 +1,53 @@
+// forked from wezterm/term/src/terminalstate/mod.rs commit: f4abf8fde
+// MIT License
+
 // The range_plus_one lint can't see when the LHS is not compatible with
 // and inclusive range
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::range_plus_one))]
-use super::*;
-use crate::color::{ColorPalette, RgbColor};
-use crate::config::{BidiMode, NewlineCanon};
+
+use super::color::ColorPalette;
+use super::config::{BidiMode, NewlineCanon, TerminalConfiguration};
+use super::threaded_writer::ThreadedWriter;
+use super::screen::Screen;
 use log::debug;
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
 use std::io::{BufWriter, Write};
-use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
+use std::ops::{Range, Deref, DerefMut};
 use terminfo::{Database, Value};
-use termwiz::cell::UnicodeVersion;
+use termwiz::color::RgbColor;
+use termwiz::cell::{Cell, UnicodeVersion, CellAttributes, SemanticType};
 use termwiz::escape::csi::{
     Cursor, CursorStyle, DecPrivateMode, DecPrivateModeCode, Device, Edit, EraseInDisplay,
     EraseInLine, Mode, Sgr, TabulationClear, TerminalMode, TerminalModeCode, Window, XtSmGraphics,
     XtSmGraphicsAction, XtSmGraphicsItem, XtSmGraphicsStatus, XtermKeyModifierResource,
 };
 use termwiz::escape::{OneBased, OperatingSystemCommand, CSI};
+use termwiz::escape::osc::Hyperlink;
 use termwiz::image::ImageData;
 use termwiz::input::KeyboardEncoding;
 use termwiz::surface::{CursorShape, CursorVisibility, SequenceNo};
 use url::Url;
 use wezterm_bidi::ParagraphDirectionHint;
+use anyhow::Error;
 
 mod image;
-mod iterm;
-mod keyboard;
 mod kitty;
-mod mouse;
-pub(crate) mod performer;
 mod sixel;
-use crate::terminalstate::image::*;
-use crate::terminalstate::kitty::*;
+mod iterm;
+
+pub mod performer;
+pub mod keyboard;
+pub mod mouse;
+
+use mouse::{MouseButton, MouseEvent};
+
+use kitty::KittyImageState;
 
 lazy_static::lazy_static! {
     static ref DB: Database = {
-        let data = include_bytes!("../../../termwiz/data/wezterm");
+        let data = include_bytes!("../termwiz_data/wezterm");
         Database::from_buffer(&data[..]).unwrap()
     };
 }
@@ -246,11 +257,148 @@ impl ScreenOrAlt {
     }
 }
 
+/// Position allows referring to an absolute visible row number
+/// or a position relative to some existing row number (typically
+/// where the cursor is located).  Both of the cases are represented
+/// as signed numbers so that the math and error checking for out
+/// of range values can be deferred to the point where we execute
+/// the request.
+#[derive(Debug)]
+pub enum Position {
+    Absolute(VisibleRowIndex),
+    Relative(i64),
+}
+
+/// Describes the location of the cursor in the visible portion
+/// of the screen.
+#[cfg_attr(feature = "use_serde", derive(Deserialize, Serialize))]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct CursorPosition {
+    pub x: usize,
+    pub y: VisibleRowIndex,
+    pub shape: termwiz::surface::CursorShape,
+    pub visibility: termwiz::surface::CursorVisibility,
+    pub seqno: SequenceNo,
+}
+
+/// Represents an index into the visible portion of the screen.
+/// Value 0 is the first visible row.  `VisibleRowIndex` needs to be
+/// resolved into a `PhysRowIndex` to obtain an actual row.  It is not
+/// valid to have a negative `VisibleRowIndex` value so this type logically
+/// should be unsigned, however, having a different sign is helpful to
+/// have the compiler catch accidental arithmetic performed between
+/// `PhysRowIndex` and `VisibleRowIndex`.  We could define our own type with
+/// its own `Add` and `Sub` operators, but then we'd not be able to iterate
+/// over `Ranges` of these types without also laboriously implementing an
+/// iterator `Skip` trait that is currently only in unstable rust.
+pub type VisibleRowIndex = i64;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub struct TerminalSize {
+    pub rows: usize,
+    pub cols: usize,
+    pub pixel_width: usize,
+    pub pixel_height: usize,
+    pub dpi: u32,
+}
+
+impl Default for TerminalSize {
+    fn default() -> Self {
+        Self {
+            rows: 24,
+            cols: 130,
+            pixel_width: 0,
+            pixel_height: 0,
+            dpi: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub enum Alert {
+    Bell,
+    ToastNotification {
+        /// The title text for the notification.
+        title: Option<String>,
+        /// The message body
+        body: String,
+        /// Whether clicking on the notification should focus the
+        /// window/tab/pane that generated it
+        focus: bool,
+    },
+    CurrentWorkingDirectoryChanged,
+    IconTitleChanged(Option<String>),
+    WindowTitleChanged(String),
+    TabTitleChanged(Option<String>),
+    /// When the color palette has been updated
+    PaletteChanged,
+    /// A UserVar has changed value
+    SetUserVar {
+        name: String,
+        value: String,
+    },
+    /// When something bumps the seqno in the terminal model and
+    /// the terminal is not focused
+    OutputSinceFocusLost,
+}
+
+pub trait AlertHandler: Send + Sync {
+    fn alert(&mut self, alert: Alert);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "use_serde", derive(Serialize, Deserialize))]
+pub enum ClipboardSelection {
+    Clipboard,
+    PrimarySelection,
+}
+
+pub trait Clipboard: Send + Sync {
+    fn set_contents(
+        &self,
+        selection: ClipboardSelection,
+        data: Option<String>,
+    ) -> anyhow::Result<()>;
+}
+
+impl Clipboard for Box<dyn Clipboard> {
+    fn set_contents(
+        &self,
+        selection: ClipboardSelection,
+        data: Option<String>,
+    ) -> anyhow::Result<()> {
+        self.as_ref().set_contents(selection, data)
+    }
+}
+
+pub trait DeviceControlHandler: Send + Sync {
+    fn handle_device_control(&mut self, _control: termwiz::escape::DeviceControlMode);
+}
+
+pub trait DownloadHandler: Send + Sync {
+    fn save_to_downloads(&self, name: Option<String>, data: Vec<u8>);
+}
+
+pub const CSI: &str = "\x1b[";
+pub const OSC: &str = "\x1b]";
+pub const ST: &str = "\x1b\\";
+pub const SS3: &str = "\x1bO";
+pub const DCS: &str = "\x1bP";
+
 /// Manages the state for the terminal
 pub struct TerminalState {
     config: Arc<dyn TerminalConfiguration>,
 
     screen: ScreenOrAlt,
+    
+    vertical_scroll_offset: usize,
+    horizontal_scroll_offset: usize,
+    
+    vertical_scroll_inverted: bool,
+    horizontal_scroll_inverted: bool,
+    
     /// The current set of attributes in effect for the next
     /// attempt to print to the display
     pen: CellAttributes,
@@ -345,6 +493,8 @@ pub struct TerminalState {
     pixel_height: usize,
     dpi: u32,
 
+	print: String,
+
     clipboard: Option<Arc<dyn Clipboard>>,
     device_control_handler: Option<Box<dyn DeviceControlHandler>>,
     alert_handler: Option<Box<dyn AlertHandler>>,
@@ -426,76 +576,9 @@ fn default_color_map() -> HashMap<u16, RgbColor> {
     color_map
 }
 
-/// This struct implements a writer that sends the data across
-/// to another thread so that the write side of the terminal
-/// processing never blocks.
-///
-/// This is important for example when processing large pastes into
-/// vim.  In that scenario, we can fill up the data pending
-/// on vim's input buffer, while it is busy trying to send
-/// output to the terminal.  A deadlock is reached because
-/// send_paste blocks on the writer, but it is unable to make
-/// progress until we're able to read the output from vim.
-///
-/// We either need input or output to be non-blocking.
-/// Output seems safest because we want to be able to exert
-/// back-pressure when there is a lot of data to read,
-/// and we're in control of the write side, which represents
-/// input from the interactive user, or pastes.
-struct ThreadedWriter {
-    sender: Sender<WriterMessage>,
-}
-
-enum WriterMessage {
-    Data(Vec<u8>),
-    Flush,
-}
-
-impl ThreadedWriter {
-    fn new(mut writer: Box<dyn std::io::Write + Send>) -> Self {
-        let (sender, receiver) = channel::<WriterMessage>();
-
-        std::thread::spawn(move || {
-            while let Ok(msg) = receiver.recv() {
-                match msg {
-                    WriterMessage::Data(buf) => {
-                        if writer.write(&buf).is_err() {
-                            break;
-                        }
-                    }
-                    WriterMessage::Flush => {
-                        if writer.flush().is_err() {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        Self { sender }
-    }
-}
-
-impl std::io::Write for ThreadedWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.sender
-            .send(WriterMessage::Data(buf.to_vec()))
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.sender
-            .send(WriterMessage::Flush)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
-        Ok(())
-    }
-}
 
 impl TerminalState {
     /// Constructs the terminal state.
-    /// You generally want the `Terminal` struct rather than this one;
-    /// Terminal contains and dereferences to `TerminalState`.
     pub fn new(
         size: TerminalSize,
         config: Arc<dyn TerminalConfiguration>,
@@ -514,6 +597,10 @@ impl TerminalState {
         TerminalState {
             config,
             screen,
+            vertical_scroll_offset: 0,
+            horizontal_scroll_offset: 0,
+            vertical_scroll_inverted: false,
+            horizontal_scroll_inverted: false,
             pen: CellAttributes::default(),
             cursor: CursorPosition::default(),
             top_and_bottom_margins: 0..size.rows as VisibleRowIndex,
@@ -557,6 +644,7 @@ impl TerminalState {
             pixel_height: size.pixel_height,
             pixel_width: size.pixel_width,
             dpi: size.dpi,
+			print: String::new(),
             clipboard: None,
             device_control_handler: None,
             alert_handler: None,
@@ -695,6 +783,14 @@ impl TerminalState {
     /// the alternate screen).
     pub fn screen_mut(&mut self) -> &mut Screen {
         &mut self.screen
+    }
+
+    pub fn vertical_scroll_offset(&self) -> usize {
+        self.vertical_scroll_offset
+    }
+
+    pub fn reset_vertical_scroll(&mut self) {
+        self.vertical_scroll_offset = 0;
     }
 
     fn set_clipboard_contents(
@@ -2615,70 +2711,5 @@ impl TerminalState {
             }
             Sgr::Font(_) => {}
         }
-    }
-
-    /// Computes the set of `SemanticZone`s for the current terminal screen.
-    /// Semantic zones are contiguous runs of cells that have the same
-    /// `SemanticType` (Prompt, Input, Output).
-    /// Due to the way that the terminal clears the screen, the raw, literal
-    /// set of zones is overly fragmented by blanks.  This method will ignore
-    /// trailing Output regions when computing the SemanticZone bounds.
-    ///
-    /// By default, all screen data is of type Output.  The shell needs to
-    /// employ OSC 133 escapes to markup its output.
-    pub fn get_semantic_zones(&mut self) -> anyhow::Result<Vec<SemanticZone>> {
-        let screen = self.screen_mut();
-
-        let mut current_zone: Option<SemanticZone> = None;
-        let mut zones = vec![];
-
-        let first_stable_row = screen.phys_to_stable_row_index(0);
-        screen.for_each_phys_line_mut(|idx, line| {
-            let stable_row = first_stable_row + idx as StableRowIndex;
-
-            for zone_range in line.semantic_zone_ranges() {
-                let new_zone = match current_zone.as_ref() {
-                    None => true,
-                    Some(zone) => zone.semantic_type != zone_range.semantic_type,
-                };
-
-                if new_zone {
-                    if let Some(zone) = current_zone.take() {
-                        zones.push(zone);
-                    }
-
-                    current_zone.replace(SemanticZone {
-                        start_x: zone_range.range.start as usize,
-                        start_y: stable_row,
-                        end_x: zone_range.range.end as usize,
-                        end_y: stable_row,
-                        semantic_type: zone_range.semantic_type,
-                    });
-                }
-
-                if let Some(zone) = current_zone.as_mut() {
-                    zone.end_x = zone_range.range.end as usize;
-                    zone.end_y = stable_row;
-                }
-            }
-        });
-        if let Some(zone) = current_zone.take() {
-            zones.push(zone);
-        }
-
-        Ok(zones)
-    }
-
-    #[inline]
-    pub fn get_reverse_video(&self) -> bool {
-        self.reverse_video_mode
-    }
-
-    pub fn get_keyboard_encoding(&self) -> KeyboardEncoding {
-        self.screen()
-            .keyboard_stack
-            .last()
-            .copied()
-            .unwrap_or(self.keyboard_encoding)
     }
 }

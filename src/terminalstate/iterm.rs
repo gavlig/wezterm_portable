@@ -1,5 +1,8 @@
-use crate::terminalstate::image::*;
-use crate::TerminalState;
+// forked from wezterm/term/src/terminalstate/iterm.rs git commit f4abf8fde
+// MIT License
+
+use super::image::*;
+use super::TerminalState;
 use ::image::imageops::FilterType;
 use ::image::ImageFormat;
 use log::error;

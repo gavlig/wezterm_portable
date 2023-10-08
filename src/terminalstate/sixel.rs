@@ -1,6 +1,9 @@
-use crate::terminalstate::image::*;
-use crate::terminalstate::{default_color_map, ImageAttachParams};
-use crate::TerminalState;
+// forked from wezterm/term/src/terminalstate/sixel.rs git commit f4abf8fde
+// MIT License
+
+use super::image::*;
+use super::{default_color_map, image::ImageAttachParams};
+use super::TerminalState;
 use ::image::RgbaImage;
 use termwiz::color::RgbColor;
 use termwiz::escape::{Sixel, SixelData};
