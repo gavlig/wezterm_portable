@@ -8,21 +8,21 @@ license = "MIT"
 
 [dependencies]
 
-termwiz				= { path = "../wezterm/termwiz", features = ["use_image"] } # { version = "0.20.0" }
-wezterm-bidi		= { path = "../wezterm/bidi" } # { version = "0.2.2" }
+termwiz				= { git = "https://github.com/wez/wezterm.git", rev = "f4abf8fde", features = ["use_image"] }
+wezterm-bidi		= { git = "https://github.com/wez/wezterm.git", rev = "f4abf8fde" }
+filedescriptor		= { git = "https://github.com/wez/wezterm.git", rev = "f4abf8fde" }
 
 anyhow				= "1"
 log					= { version = "0.4" }
 hex                 = { version = "0.4.3"}
 
 thiserror			= { version = "1.0" }
-filedescriptor		= { version = "0.8" }
 crossbeam-channel	= { version = "0.5" }
 
 num-traits			= { version = "0.2" }
 csscolorparser		= { version = "0.6", features=["lab"] }
 lazy_static			= { version = "1.4" }
-ordered-float		= { version = "3.7" }
+ordered-float		= { version = "3.9.1" } # has to be in sync with what is used in wezterm or override it lower
 unicode-normalization = { version = "0.1" }
 finl_unicode		= { version = "1.2" }
 url					= { version = "2.4" }
