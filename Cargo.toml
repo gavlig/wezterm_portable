@@ -8,9 +8,9 @@ license = "MIT"
 
 [dependencies]
 
-termwiz				= { git = "https://github.com/gavlig/wezterm.git", features = ["use_image"] }
-wezterm-bidi		= { git = "https://github.com/gavlig/wezterm.git" }
-filedescriptor		= { git = "https://github.com/gavlig/wezterm.git" }
+termwiz				= { git = "https://github.com/gavlig/wezterm.git", branch = "portable", features = ["use_image"] }
+wezterm-bidi		= { git = "https://github.com/gavlig/wezterm.git", branch = "portable" }
+filedescriptor		= { git = "https://github.com/gavlig/wezterm.git", branch = "portable" }
 
 anyhow				= "1"
 log					= { version = "0.4" }
