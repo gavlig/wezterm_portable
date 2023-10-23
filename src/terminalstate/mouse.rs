@@ -237,7 +237,7 @@ impl TerminalState {
                 _ => bail!("unexpected mouse event"),
             };
             
-            self.vertical_scroll_offset = self.vertical_scroll_offset.clamp(0, self.screen.scrollback_rows().saturating_sub(1) - self.screen.physical_rows);
+            self.vertical_scroll_offset = self.vertical_scroll_offset.clamp(0, self.screen.scrollback_rows().saturating_sub(self.screen.physical_rows + 1));
             // self.horizontal_scroll_offset = self.horizontal_scroll_offset.clamp(0, self.screen.physical_cols.saturating_sub(1));
         }
         Ok(())
