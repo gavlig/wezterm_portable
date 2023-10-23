@@ -180,8 +180,6 @@ impl TerminalState {
 
         std::mem::swap(&mut self.print, &mut p);
         self.print.clear();
-
-        self.reset_vertical_scroll();
     }
 
     /// ConPTY, at the time of writing, does something horrible to rewrite

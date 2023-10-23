@@ -33,15 +33,15 @@ impl TerminalState {
         let scroll_cached = self.vertical_scroll_offset;
 
         match key {
-			// scroll to bottom on arrow key input
-            KeyCode::UpArrow | KeyCode::DownArrow => { self.reset_vertical_scroll() },
+			// scroll to bottom on esc or arrow key input
+            KeyCode::UpArrow | KeyCode::DownArrow | KeyCode::Escape => { self.reset_vertical_scroll() },
 			// scroll with PageUp
 			KeyCode::PageUp if is_down && mods.contains(KeyModifiers::SHIFT) => {
                 self.vertical_scroll_offset += self.screen().physical_rows / 2;
              },
 			// scroll with PageDown
 			KeyCode::PageDown if is_down && mods.contains(KeyModifiers::SHIFT) => {
-                self.vertical_scroll_offset = self.vertical_scroll_offset.saturating_sub(self.screen().physical_rows / 2)
+                self.vertical_scroll_offset = self.vertical_scroll_offset.saturating_sub(self.screen().physical_rows / 2);
             },
             _ => (),
         }
