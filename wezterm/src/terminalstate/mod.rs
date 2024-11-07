@@ -789,6 +789,10 @@ impl TerminalState {
         self.vertical_scroll_offset
     }
 
+    pub fn set_vertical_scroll(&mut self, new_scroll: usize) {
+        self.vertical_scroll_offset = new_scroll;
+    }
+
     pub fn reset_vertical_scroll(&mut self) {
         self.vertical_scroll_offset = 0;
     }
