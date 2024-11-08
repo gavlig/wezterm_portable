@@ -229,16 +229,13 @@ impl TerminalState {
                 )?;
             }
         } else {
-            self.vertical_scroll_offset = match event.button {
-                MouseButton::WheelDown(cnt) => self.vertical_scroll_offset.saturating_sub(cnt),
-                MouseButton::WheelUp(cnt) => self.vertical_scroll_offset.saturating_add(cnt),
-                MouseButton::WheelLeft(cnt) => self.horizontal_scroll_offset.saturating_sub(cnt),
-                MouseButton::WheelRight(cnt) => self.horizontal_scroll_offset.saturating_add(cnt),
+            self.vertical_scroll = match event.button {
+                MouseButton::WheelDown(cnt) => self.vertical_scroll.saturating_sub(cnt),
+                MouseButton::WheelUp(cnt) => self.vertical_scroll.saturating_add(cnt),
                 _ => bail!("unexpected mouse event"),
             };
-            
-            self.vertical_scroll_offset = self.vertical_scroll_offset.clamp(0, self.screen.scrollback_rows().saturating_sub(self.screen.physical_rows + 1));
-            // self.horizontal_scroll_offset = self.horizontal_scroll_offset.clamp(0, self.screen.physical_cols.saturating_sub(1));
+
+            self.vertical_scroll = self.vertical_scroll.clamp(0, self.screen.scrollback_rows().saturating_sub(self.screen.physical_rows + 1));
         }
         Ok(())
     }

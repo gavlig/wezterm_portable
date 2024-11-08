@@ -392,13 +392,9 @@ pub struct TerminalState {
     config: Arc<dyn TerminalConfiguration>,
 
     screen: ScreenOrAlt,
-    
-    vertical_scroll_offset: usize,
-    horizontal_scroll_offset: usize,
-    
-    vertical_scroll_inverted: bool,
-    horizontal_scroll_inverted: bool,
-    
+
+    vertical_scroll: usize,
+
     /// The current set of attributes in effect for the next
     /// attempt to print to the display
     pen: CellAttributes,
@@ -597,10 +593,7 @@ impl TerminalState {
         TerminalState {
             config,
             screen,
-            vertical_scroll_offset: 0,
-            horizontal_scroll_offset: 0,
-            vertical_scroll_inverted: false,
-            horizontal_scroll_inverted: false,
+            vertical_scroll: 0,
             pen: CellAttributes::default(),
             cursor: CursorPosition::default(),
             top_and_bottom_margins: 0..size.rows as VisibleRowIndex,
@@ -785,16 +778,20 @@ impl TerminalState {
         &mut self.screen
     }
 
-    pub fn vertical_scroll_offset(&self) -> usize {
-        self.vertical_scroll_offset
+    pub fn vertical_scroll(&self) -> usize {
+        self.vertical_scroll
     }
 
     pub fn set_vertical_scroll(&mut self, new_scroll: usize) {
-        self.vertical_scroll_offset = new_scroll;
+        self.vertical_scroll = new_scroll;
     }
 
     pub fn reset_vertical_scroll(&mut self) {
-        self.vertical_scroll_offset = 0;
+        self.vertical_scroll = self.screen.lines.len().saturating_sub(self.screen.physical_rows) + 1;
+    }
+
+    pub fn scroll_by(&mut self, scroll_delta: isize) {
+        self.vertical_scroll = self.vertical_scroll.saturating_add_signed(scroll_delta);
     }
 
     fn set_clipboard_contents(
