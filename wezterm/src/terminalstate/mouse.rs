@@ -229,13 +229,13 @@ impl TerminalState {
                 )?;
             }
         } else {
-            self.vertical_scroll = match event.button {
-                MouseButton::WheelDown(cnt) => self.vertical_scroll.saturating_sub(cnt),
-                MouseButton::WheelUp(cnt) => self.vertical_scroll.saturating_add(cnt),
+            let new_scroll = match event.button {
+                MouseButton::WheelDown(cnt) => self.vertical_scroll.saturating_add(cnt),
+                MouseButton::WheelUp(cnt) => self.vertical_scroll.saturating_sub(cnt),
                 _ => bail!("unexpected mouse event"),
             };
 
-            self.vertical_scroll = self.vertical_scroll.clamp(0, self.screen.scrollback_rows().saturating_sub(self.screen.physical_rows + 1));
+            self.set_vertical_scroll(new_scroll);
         }
         Ok(())
     }

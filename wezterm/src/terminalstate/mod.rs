@@ -783,11 +783,11 @@ impl TerminalState {
     }
 
     pub fn set_vertical_scroll(&mut self, new_scroll: usize) {
-        self.vertical_scroll = new_scroll;
+        self.vertical_scroll = new_scroll.clamp(0, self.screen.scrollback_rows() - self.screen.physical_rows);
     }
 
     pub fn reset_vertical_scroll(&mut self) {
-        self.vertical_scroll = self.screen.lines.len().saturating_sub(self.screen.physical_rows) + 1;
+        self.set_vertical_scroll(self.screen.lines.len().saturating_sub(self.screen.physical_rows) + 1);
     }
 
     pub fn scroll_by(&mut self, scroll_delta: isize) {

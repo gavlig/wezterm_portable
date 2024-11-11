@@ -30,24 +30,18 @@ impl TerminalState {
         mods: KeyModifiers,
         is_down: bool,
     ) -> anyhow::Result<()> {
-        let scroll_cached = self.vertical_scroll;
-
         match key {
 			// scroll to bottom on esc or arrow key input
             KeyCode::UpArrow | KeyCode::DownArrow | KeyCode::Escape => { self.reset_vertical_scroll() },
 			// scroll with PageUp
 			KeyCode::PageUp if is_down && mods.contains(KeyModifiers::SHIFT) => {
-                self.vertical_scroll = self.vertical_scroll.saturating_sub(self.screen().physical_rows / 2);
+                self.set_vertical_scroll(self.vertical_scroll.saturating_sub(self.screen().physical_rows / 2));
              },
 			// scroll with PageDown
 			KeyCode::PageDown if is_down && mods.contains(KeyModifiers::SHIFT) => {
-                self.vertical_scroll += self.screen().physical_rows / 2;
+                self.set_vertical_scroll(self.vertical_scroll + self.screen().physical_rows / 2);
             },
             _ => (),
-        }
-
-        if scroll_cached != self.vertical_scroll {
-            self.vertical_scroll = self.vertical_scroll.clamp(0, self.screen.scrollback_rows() - self.screen.physical_rows);
         }
 
         let encoding = self.effective_keyboard_encoding();
