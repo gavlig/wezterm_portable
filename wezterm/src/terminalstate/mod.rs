@@ -394,6 +394,7 @@ pub struct TerminalState {
     screen: ScreenOrAlt,
 
     vertical_scroll: usize,
+    vertical_scroll_dirty: bool,
 
     /// The current set of attributes in effect for the next
     /// attempt to print to the display
@@ -594,6 +595,7 @@ impl TerminalState {
             config,
             screen,
             vertical_scroll: 0,
+            vertical_scroll_dirty: false,
             pen: CellAttributes::default(),
             cursor: CursorPosition::default(),
             top_and_bottom_margins: 0..size.rows as VisibleRowIndex,
@@ -782,8 +784,18 @@ impl TerminalState {
         self.vertical_scroll
     }
 
+    pub fn vertical_scroll_dirty(&self) -> bool {
+        self.vertical_scroll_dirty
+    }
+
+    pub fn vertical_scroll_apply(&mut self) -> usize {
+        self.vertical_scroll_dirty = false;
+        self.vertical_scroll
+    }
+
     pub fn set_vertical_scroll(&mut self, new_scroll: usize) {
         self.vertical_scroll = new_scroll.clamp(0, self.screen.scrollback_rows() - self.screen.physical_rows);
+        self.vertical_scroll_dirty = true;
     }
 
     pub fn reset_vertical_scroll(&mut self) {
